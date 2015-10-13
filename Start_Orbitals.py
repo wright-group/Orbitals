@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Thu Jun 11 13:38:01 2015
-# Instantiate the application
-
 
 # Create the GUI and start the application
 
