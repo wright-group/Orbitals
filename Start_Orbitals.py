@@ -7,10 +7,12 @@ Created on Thu Jun 11 13:38:01 2015
 @author: Matt B Rowley
 """
 import sys
-import PyQt4.QtCore as QtCore
-import PyQt4.QtGui as QtGui
+#import PyQt4.QtCore as QtCore
+#import PyQt4.QtGui as QtGui
+from pyface.qt import QtGui, QtCore
 import Orbitals_UI
-
+import os
+os.environ['ETS_TOOLKIT'] = 'qt4'
 
 def main():
     window = Orbitals_UI.MainWindow()
@@ -18,6 +20,6 @@ def main():
     window.showMaximized()
     return window
 
-#app = QtGui.QApplication(sys.argv)
+app = QtGui.QApplication.instance()
 window = main()
-#app.exec_()
+app.exec_()
