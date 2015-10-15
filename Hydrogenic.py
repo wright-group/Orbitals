@@ -171,7 +171,12 @@ orbitals = {'1s': Orbital(1, 0, 0),
             '3px': Orbital(3, 1, 'x'),
             '3py': Orbital(3, 1, 'y'),
             '3p1': Orbital(3, 1, 1),
-            '3p-1': Orbital(3, 1, -1)}
+            '3p-1': Orbital(3, 1, -1),
+            '3dz^2': Orbital(3, 2, 0),
+            '3dxz': Orbital(3, 2, 'xz'),
+            '3dyz': Orbital(3, 2, 'yz'),
+            '3dx^2-y^2': Orbital(3, 2, 'x^2-y^2'),
+            '3dxy': Orbital(3, 2, 'xy')}
 
 # The MIT License (MIT)
 #

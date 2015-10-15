@@ -64,24 +64,64 @@ class OrbitalsPanel(QtGui.QWidget):
         self.m = 0
         self.s = 1
         self.layout = QtGui.QVBoxLayout(self)
-        self.invert = QtGui.QCheckBox(self, text='Invert Spin')
-        self.layout.addWidget(self.invert)
-        self.orbitals_layout = QtGui.QHBoxLayout()
         self.real = QtGui.QVBoxLayout()
-        self.real_label = QtGui.QLabel(self, text='Real')
-        self.real.addWidget(self.real_label)
+        self.s1_layout = QtGui.QHBoxLayout()
+        self.s1_layout.addItem(HorizontalSpacer())
         self.s1 = OrbitalButton(self.my_orbital, self, text='1s')
-        self.real.addWidget(self.s1)
+        self.s1_layout.addWidget(self.s1)
+        self.s1_layout.addItem(HorizontalSpacer())
+        self.real.addLayout(self.s1_layout)
+        self.real.addWidget(CenteredLine(self))
+        self.s2_layout = QtGui.QHBoxLayout()
+        self.s2_layout.addItem(HorizontalSpacer())
         self.s2 = OrbitalButton(self.my_orbital, self, text='2s')
-        self.real.addWidget(self.s2)
+        self.s2_layout.addWidget(self.s2)
+        self.s2_layout.addItem(HorizontalSpacer())
+        self.real.addLayout(self.s2_layout)
         self.p2_layout = QtGui.QHBoxLayout()
+        self.p2_layout.addItem(HorizontalSpacer())
         self.p2x = OrbitalButton(self.my_orbital, self, text='2px')
         self.p2_layout.addWidget(self.p2x)
         self.p2y = OrbitalButton(self.my_orbital, self, text='2py')
         self.p2_layout.addWidget(self.p2y)
         self.p2z = OrbitalButton(self.my_orbital, self, text='2pz')
         self.p2_layout.addWidget(self.p2z)
+        self.p2_layout.addItem(HorizontalSpacer())
         self.real.addLayout(self.p2_layout)
+        self.real.addWidget(CenteredLine(self))
+        self.p3_layout = QtGui.QHBoxLayout()
+        self.p3_layout.addItem(HorizontalSpacer())
+        self.p3x = OrbitalButton(self.my_orbital, self, text='3px')
+        self.p3_layout.addWidget(self.p3x)
+        self.p3y = OrbitalButton(self.my_orbital, self, text='3py')
+        self.p3_layout.addWidget(self.p3y)
+        self.p3z = OrbitalButton(self.my_orbital, self, text='3pz')
+        self.p3_layout.addWidget(self.p3z)
+        self.p3_layout.addItem(HorizontalSpacer())
+        self.real.addLayout(self.p3_layout)
+        self.d3_layout = QtGui.QHBoxLayout()
+        self.d3_layout.addItem(HorizontalSpacer())
+        self.d3z2 = OrbitalButton(self.my_orbital, self, text='3dz^2')
+        self.d3_layout.addWidget(self.d3z2)
+        self.d3xz = OrbitalButton(self.my_orbital, self, text='3dxz')
+        self.d3_layout.addWidget(self.d3xz)
+        self.d3_layout.addItem(HorizontalSpacer())
+        self.real.addLayout(self.d3_layout)
+        self.d3_layout2 = QtGui.QHBoxLayout()
+        self.d3_layout2.addItem(HorizontalSpacer())
+        self.d3yz = OrbitalButton(self.my_orbital, self, text='3dyz')
+        self.d3_layout2.addWidget(self.d3yz)
+        self.d3x2y2 = OrbitalButton(self.my_orbital, self, text='3dx^2-y^2')
+        self.d3_layout2.addWidget(self.d3x2y2)
+        self.d3xy = OrbitalButton(self.my_orbital, self, text='3dxy')
+        self.d3_layout2.addWidget(self.d3xy)
+        self.d3_layout2.addItem(HorizontalSpacer())
+        self.real.addLayout(self.d3_layout2)
+        self.real.addWidget(CenteredLine(self))
+        self.f4_layout = QtGui.QHBoxLayout()
+        self.real.addLayout(self.f4_layout)
+        self.f4_layout2 = QtGui.QHBoxLayout()
+        self.real.addLayout(self.f4_layout2)
         self.real.addItem(VerticalSpacer())
         self.layout.addLayout(self.real)
         self.layout.addWidget(HorizontalLine(self))
@@ -163,21 +203,18 @@ class CoherencePanel(QtGui.QWidget):
         global ket_orbital, bra_orbital, signals
         QtGui.QWidget.__init__(self, parent)
         self.layout = QtGui.QVBoxLayout(self)
-        self.inst_text = '''Coherence -
-        A coherence is an oscillating wavefunction which is composed of two
-        states. Usually an external electric field (light) induces a coherence
-        between the ground and excited state for the transition which is
-        resonant with the light.'''
-        self.instructions = QtGui.QLabel(self, text=self.inst_text)
-        self.layout.addWidget(self.instructions)
-        self.layout.addWidget(HorizontalLine(self))
         self.options = QtGui.QHBoxLayout()
         self.rabi = QtGui.QCheckBox(self, text='Show Rabi Cycle')
         self.options.addWidget(self.rabi)
+        self.fid = QtGui.QCheckBox(self, text='Show FID')
+        self.options.addWidget(self.fid)
+        self.i_button = InstructionsButton(self, my_file='Coherences.txt')
+        self.options.addWidget(self.i_button)
         self.layout.addLayout(self.options)
         self.functions = QtGui.QHBoxLayout()
         self.ket_layout = QtGui.QVBoxLayout()
         self.ket_label = QtGui.QLabel(self, text='|ket>')
+        self.ket_label.setAlignment(QtCore.Qt.AlignRight)
         self.ket_layout.addWidget(self.ket_label)
         self.ket_layout.addWidget(HorizontalLine())
         self.ket_orbitals = OrbitalsPanel(ket_orbital, self)
@@ -230,8 +267,9 @@ class VerticalSpacer(QtGui.QSpacerItem):
 
 
 class HorizontalSpacer(QtGui.QSpacerItem):
-    def __init__(self):
-        QtGui.QSpacerItem.__init__(self, 20, 20, QtGui.QSizePolicy.Expanding,
+    def __init__(self, width=20, height = 20,
+                 Horizontal_Policy=QtGui.QSizePolicy.Expanding):
+        QtGui.QSpacerItem.__init__(self, width, height, Horizontal_Policy,
                                    QtGui.QSizePolicy.Minimum)
 
 
@@ -240,6 +278,15 @@ class VerticalLine(QtGui.QFrame):
         QtGui.QFrame.__init__(self, parent)
         self.setFrameShape(QtGui.QFrame.VLine)
         self.setFrameShadow(QtGui.QFrame.Sunken)
+
+
+class CenteredLine(QtGui.QWidget):
+    def __init__(self, parent=None):
+        QtGui.QWidget.__init__(self, parent)
+        self.layout = QtGui.QHBoxLayout(self)
+        self.layout.addItem(HorizontalSpacer(30, 1, QtGui.QSizePolicy.Fixed))
+        self.layout.addWidget(HorizontalLine())
+        self.layout.addItem(HorizontalSpacer(30, 1, QtGui.QSizePolicy.Fixed))
 
 
 class HorizontalLine(QtGui.QFrame):
@@ -261,6 +308,43 @@ class OrbitalButton(QtGui.QPushButton):
         self.my_orbital.writeName(self.target_text)
         signals.orbital_change.emit()
 
+
+class InstructionsButton(QtGui.QPushButton):
+    def __init__(self, my_orbital, parent=None, my_file=''):
+        QtGui.QPushButton.__init__(self, parent=parent, text='Instructions')
+        self.clicked.connect(self.showInstructions)
+        self.my_file = my_file
+
+    def showInstructions(self):
+        try:
+            this_file_path = os.path.abspath(__file__)
+            this_folder_path = os.path.dirname(this_file_path)
+            folderpath = os.path.join(this_folder_path, 'Tab_Instructions')
+            filename = os.path.join(folderpath, self.my_file)
+            with open(filename, "r") as instructions_file:
+                lines = instructions_file.readlines()
+            self.instruction_dialog = InstructionsDialog(lines=lines)
+        except Exception as e:
+            print(e)
+
+
+class InstructionsDialog(QtGui.QDialog):
+    def __init__(self, parent=None, lines=[]):
+        QtGui.QDialog.__init__(self, parent=parent)
+        self.setWindowTitle(lines[0][:-1])
+        self.layout = QtGui.QVBoxLayout(self)
+        text = ''
+        for line in lines[1:]:
+            text = text + line
+        self.layout.addWidget(QtGui.QLabel(text = text))
+        self.close_button = QtGui.QPushButton(text='Close')
+        self.layout.addWidget(self.close_button)
+        self.close_button.clicked.connect(self.close)
+        self.show()
+
+    def closeWindow(self):
+        print("Close Clicked")
+        self.close()
 
 class Visualization(HasTraits):
     '''

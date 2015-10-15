@@ -1,0 +1,6 @@
+Instructions for the Coherences Tab
+Coherences
+A coherence is an oscillating wavefunction which is composed of two
+states. Usually an external electric field (light) induces a coherence
+between the ground and excited state for the transition which is
+resonant with the light.
