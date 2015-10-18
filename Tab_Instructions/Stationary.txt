@@ -1,0 +1,5 @@
+Instructions for the Stationary States Tab
+Stationary States
+A stationary state is a population in a single quantum state. Select a
+common named orbital (either real, or complex), or input arbitrary
+quantum numbers.

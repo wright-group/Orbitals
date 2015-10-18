@@ -187,12 +187,8 @@ class StationaryPanel(QtGui.QWidget):
         global stationary_orbital
         QtGui.QWidget.__init__(self, parent)
         self.layout = QtGui.QVBoxLayout(self)
-        self.inst_text = '''Stationary State -
-        A stationary state is a population in a single quantum state. Select a
-        common named orbital (either real, or complex), or input arbitrary
-        quantum numbers.'''
-        self.instructions = QtGui.QLabel(self, text=self.inst_text)
-        self.layout.addWidget(self.instructions)
+        self.inst_button = InstructionsButton(self, my_file='Stationary.txt')
+        self.layout.addWidget(self.inst_button)
         self.layout.addWidget(HorizontalLine(self))
         self.orbitals = OrbitalsPanel(stationary_orbital, self)
         self.layout.addWidget(self.orbitals)
@@ -446,7 +442,7 @@ class OrbitalCalculator(QtCore.QMutex):
         self.phi = np.array(new_phi)
         self.theta = np.array(new_theta)
         '''
-        self.phi, self.theta = np.mgrid[0:np.pi:50j, 0:2*np.pi:100j]
+        self.phi, self.theta = np.mgrid[0:np.pi:30j, 0:2*np.pi:60j]
         signals.orbital_change.connect(self.orbitalChange)
         signals.animate_clicked.connect(self.setupAnimation)
         self.orbitalChange()
