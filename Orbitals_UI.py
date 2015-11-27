@@ -9,16 +9,14 @@ hydrogenic wavefunctions.
 @author: Matthew B Rowley
 """
 
-# A few global variables
-
 import os
+# This must be called before importing traits and mayavi elements
 os.environ['ETS_TOOLKIT'] = 'qt4'
 from pyface.qt import QtGui, QtCore
 from traits.api import HasTraits, Instance, on_trait_change
 from traitsui.api import View, Item
 from mayavi.core.ui.api import MayaviScene, MlabSceneModel, SceneEditor
 import Hydrogenic as hyd
-import time
 import numpy as np
 #os.environ['ETS_TOOLKIT'] = 'qt4'
 
@@ -38,6 +36,10 @@ class MainWindow(QtGui.QMainWindow):
         self.tabs.setMaximumWidth(550)
         self.tabs.currentChanged.connect(self.changeTab)
         self.left_layout.addWidget(self.tabs)
+        self.animate_button = QtGui.QPushButton(self,
+                                                text='Start/Stop Animation')
+        self.left_layout.addWidget(self.animate_button)
+        self.animate_button.clicked.connect(signals.animate_clicked.emit)
         self.author = AuthorPanel(self)
         self.left_layout.addWidget(self.author)
         self.layout.addLayout(self.left_layout)
@@ -195,14 +197,16 @@ class StationaryPanel(QtGui.QWidget):
 
 
 class CoherencePanel(QtGui.QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, state=None):
         global ket_orbital, bra_orbital, signals
         QtGui.QWidget.__init__(self, parent)
         self.layout = QtGui.QVBoxLayout(self)
         self.options = QtGui.QHBoxLayout()
-        self.rabi = QtGui.QCheckBox(self, text='Show Rabi Cycle')
+        self.coherence = QtGui.QRadioButton(self, text='Show Coherence')
+        self.options.addWidget(self.coherence)
+        self.rabi = QtGui.QRadioButton(self, text='Show Rabi Cycle')
         self.options.addWidget(self.rabi)
-        self.fid = QtGui.QCheckBox(self, text='Show FID')
+        self.fid = QtGui.QRadioButton(self, text='Show FID')
         self.options.addWidget(self.fid)
         self.i_button = InstructionsButton(self, my_file='Coherences.txt')
         self.options.addWidget(self.i_button)
@@ -225,10 +229,6 @@ class CoherencePanel(QtGui.QWidget):
         self.functions.addWidget(VerticalLine())
         self.functions.addLayout(self.bra_layout)
         self.layout.addLayout(self.functions)
-        self.animate_button = QtGui.QPushButton(self,
-                                                text='Start/Stop Animation')
-        self.layout.addWidget(self.animate_button)
-        self.animate_button.clicked.connect(signals.animate_clicked.emit)
 
 
 class CrossingPanel(QtGui.QWidget):
@@ -263,7 +263,7 @@ class VerticalSpacer(QtGui.QSpacerItem):
 
 
 class HorizontalSpacer(QtGui.QSpacerItem):
-    def __init__(self, width=20, height = 20,
+    def __init__(self, width=20, height=20,
                  Horizontal_Policy=QtGui.QSizePolicy.Expanding):
         QtGui.QSpacerItem.__init__(self, width, height, Horizontal_Policy,
                                    QtGui.QSizePolicy.Minimum)
@@ -293,6 +293,9 @@ class HorizontalLine(QtGui.QFrame):
 
 
 class OrbitalButton(QtGui.QPushButton):
+    '''
+    A button which will pass the appropriate orbital wavefunction.
+    '''
     def __init__(self, my_orbital, parent=None, text=''):
         QtGui.QPushButton.__init__(self, parent=None, text=text)
         self.clicked.connect(self.writeOrbital)
@@ -306,6 +309,11 @@ class OrbitalButton(QtGui.QPushButton):
 
 
 class InstructionsButton(QtGui.QPushButton):
+    '''
+    A button which will call up an appropriate InstructionsDialog dialog
+    window. Pass the my_file keyword argument for the appropriate .txt file
+    filename.
+    '''
     def __init__(self, my_orbital, parent=None, my_file=''):
         QtGui.QPushButton.__init__(self, parent=parent, text='Instructions')
         self.clicked.connect(self.showInstructions)
@@ -325,6 +333,10 @@ class InstructionsButton(QtGui.QPushButton):
 
 
 class InstructionsDialog(QtGui.QDialog):
+    '''
+    A pop-up window to explain each tab with instructions which can be changed
+    and customized by editing the appropriate .txt file.
+    '''
     def __init__(self, parent=None, lines=[]):
         QtGui.QDialog.__init__(self, parent=parent)
         self.setWindowTitle(lines[0][:-1])
@@ -332,7 +344,7 @@ class InstructionsDialog(QtGui.QDialog):
         text = ''
         for line in lines[1:]:
             text = text + line
-        self.layout.addWidget(QtGui.QLabel(text = text))
+        self.layout.addWidget(QtGui.QLabel(text=text))
         self.close_button = QtGui.QPushButton(text='Close')
         self.layout.addWidget(self.close_button)
         self.close_button.clicked.connect(self.close)
@@ -341,6 +353,7 @@ class InstructionsDialog(QtGui.QDialog):
     def closeWindow(self):
         print("Close Clicked")
         self.close()
+
 
 class Visualization(HasTraits):
     '''
@@ -358,14 +371,11 @@ class Visualization(HasTraits):
         global points
         self.scene.mlab.clf()
         x, y, z, psi = points.readPoints()
-        self.mesh = self.scene.mlab.mesh(x, y, z, scalars=psi, colormap='jet', vmax=np.pi, vmin=-np.pi)
-        #jet_map = self.mesh.module_manager.scalar_lut_manager.lut.table.to_array()
-        #jet_map2 = jet_map[::-1]
-        #jet_map2[:,1] = jet_map[:,2]
-        #jet_map2[:,2] = jet_map[:,1]
-        #jet_map2 = jet_map2[::-1]
-        #my_map = np.concatenate((jet_map, jet_map2))
-        my_map = [[255,0,0,255],[140,0,140,255],[140,0,140,255],[0,0,255,255],[0,0,255,255],[255,153,18,255],[255,153,18,255],[255,0,0,255]]
+        self.mesh = self.scene.mlab.mesh(x, y, z, scalars=psi, colormap='jet',
+                                         vmax=np.pi, vmin=-np.pi)
+        my_map = [[255, 0, 0, 255], [140, 0, 140, 255], [140, 0, 140, 255],
+                  [0, 0, 255, 255], [0, 0, 255, 255], [255, 153, 18, 255],
+                  [255, 153, 18, 255], [255, 0, 0, 255]]
         self.mesh.module_manager.scalar_lut_manager.lut.table = my_map
         self.axes = self.scene.mlab.axes()
         self.fig = self.scene.mlab.gcf()
@@ -422,27 +432,7 @@ class OrbitalCalculator(QtCore.QMutex):
         self.mode = 'Stationary States'
         self.rabi = False
         self.animating = False
-        '''
-        phi = []
-        theta = []
-        num = 15
-        phi_vals = np.linspace(0, 1 * np.pi, num / 2)
-        for phival in phi_vals:
-            theta_vals = np.linspace(0, 2 * np.pi, np.sin(phival) * num + 1)
-            theta_offset = np.random.rand()
-            for thetaval in theta_vals:
-                phi.append(phival)
-                theta.append(thetaval + theta_offset)
-        new_phi=[]
-        new_theta=[]
-        length = len(phi)
-        for i, phi_val in enumerate(phi):
-            new_theta.append(theta)
-            new_phi.append(np.ones_like(phi)*phi_val)
-        self.phi = np.array(new_phi)
-        self.theta = np.array(new_theta)
-        '''
-        self.phi, self.theta = np.mgrid[0:np.pi:30j, 0:2*np.pi:60j]
+        self.phi, self.theta = np.mgrid[0:np.pi:50j, 0:2*np.pi:100j]
         signals.orbital_change.connect(self.orbitalChange)
         signals.animate_clicked.connect(self.setupAnimation)
         self.orbitalChange()
@@ -450,6 +440,9 @@ class OrbitalCalculator(QtCore.QMutex):
         self.animation_timer.timeout.connect(self.runAnimation)
 
     def writeMode(self, new_mode):
+        '''
+        Set the variable which keeps track of which tab is currently selected
+        '''
         self.lock()
         self.mode = new_mode
         self.unlock()

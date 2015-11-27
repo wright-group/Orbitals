@@ -11,7 +11,9 @@ named 'LICENSE'.
 Running Orbitals!
 -----------------
 To run, first ensure that you have all the dependencies installed.
-Then run 'python Start_Orbitals.py'
+Then run:
+
+``python Start_Orbitals.py``
 
 ###Dependencies
 
@@ -29,7 +31,7 @@ Then run 'python Start_Orbitals.py'
 
   * traitsui
 
-To install dependencies, try using a python package manager, such as pip. For example, try running the following (with the necessary privileges to make changes to your python installation directory):
+To install dependencies, you may want to use a python package manager, such as pip. For example, try running the following (with the necessary privileges to make changes to your python installation directory):
 
 ``pip install PyQt4 scipy numpy mayavi pyface traits traitsui``
 
