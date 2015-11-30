@@ -472,7 +472,7 @@ class OrbitalCalculator(QtCore.QMutex):
                 self.radial = self.radialNoCycle
                 self.angular = self.angularNoCycle
                 self.angularConjugate = self.angularNoCycleConjugate
-                self.times = np.linspace(0, 2*np.pi, 100)
+                self.times = np.linspace(0, 2*np.pi, 1000)
             else:
                 self.radial = self.radialRabiCycle
                 self.angular = self.angularRabiCycle
@@ -508,6 +508,7 @@ class OrbitalCalculator(QtCore.QMutex):
         return 0.5/sqrt2*(self.ket.r_90p + self.bra.r_90p)
 
     def angularNoCycle(self, theta, phi, t):
+        print(np.sin(t)*np.sin(t), np.cos(t)*np.cos(t))
         return (np.exp(1j*3*t)*self.ket.angular(theta, phi) +
                 np.exp(1j*1*t)*self.bra.angular(theta, phi))
 
@@ -515,17 +516,17 @@ class OrbitalCalculator(QtCore.QMutex):
         return (np.exp(-1*1j*3*t)*self.ket.angular(theta, phi) +
                 np.exp(-1*1j*1*t)*self.bra.angular(theta, phi))
 
-    def radialRabiCycle(self, t):
-        return 0.5/sqrt2*(np.sin(t)*np.sin(t)*self.ket.r_90p +
-                    np.cos(t)*np.cos(t)*self.bra.r_90p)
+    def radialNoCycle(self, t):
+        return 1.5/sqrt2*(np.sin(t)*np.sin(t)*self.ket.r_90p +
+                        np.cos(t)*np.cos(t)*self.bra.r_90p)
 
-    def angularRabiCycle(self, theta, phi, t):
-        return (np.sin(t)*np.exp(1j*5*t)*self.ket.angular(theta, phi) +
+    def angularNoCycle(self, theta, phi, t):
+        return (np.sin(t)*np.exp(1j*50*t)*self.ket.angular(theta, phi) +
                 np.cos(t)*np.exp(1j*1*t)*self.bra.angular(theta, phi))
 
-    def angularRabiCycleConjugate(self, theta, phi, t):
-        return (np.sin(t)*np.exp(1j*-5*t)*self.ket.angular(theta, phi) +
-                np.cos(t)*np.exp(1j*-1*t)*self.bra.angular(theta, phi))
+    def angularNoCycleConjugate(self, theta, phi, t):
+        return (np.sin(t)*np.exp(-1*1j*50*t)*self.ket.angular(theta, phi) +
+                np.cos(t)*np.exp(-1*1j*1*t)*self.bra.angular(theta, phi))
 
 
 class OrbitalMutex(QtCore.QMutex):
