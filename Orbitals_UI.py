@@ -448,7 +448,7 @@ class OrbitalCalculator(QtCore.QMutex):
         self.stationary_orbital = stationary_orbital
         self.ket_orbital = ket_orbital
         self.bra_orbital = bra_orbital
-        self.times = np.linspace(0, 2*np.pi, 50)
+        self.times = np.linspace(0.0, 2*np.pi, 1000)
         self.signals = signals
         self.zoom = zoom
         self.points = points
@@ -484,18 +484,20 @@ class OrbitalCalculator(QtCore.QMutex):
 
     def stationaryMode(self):
         '''Prepare the visualization for stationary states mode'''
+        print('Stationary Mode')
         self.animation_timer.timeout.connect(self.runStationary)
-        self.times = np.linspace(0, np.pi, 100)
         self.changeStationary(first=True)
 
     def coherencesMode(self):
         '''Prepare the visualization for coherences mode'''
+        print('Coherence Mode')
         self.animation_timer.timeout.connect(self.runCoherence)
         self.zoom.write(False)
         self.changeCoherence(first=True)
 
     def crossingsMode(self):
         '''Prepare the visualization for avoided crossings mode'''
+        print('Crossings Mode')
         self.animation_timer.stop()
         self.animating = False
 
@@ -520,16 +522,14 @@ class OrbitalCalculator(QtCore.QMutex):
         self.ket = self.ket_orbital.read()
         self.bra = self.bra_orbital.read()
         if self.coherence is True:
-            self.times = np.linspace(0, 2*np.pi, 1000)
             self.radial = self.radialNoCycle
             self.angular = self.angularNoCycle
-        else:
+        elif self.rabi is True:
             self.radial = self.radialRabiCycle
             self.angular = self.angularRabiCycle
-            if self.rabi is True:
-                self.times = np.linspace(0, 2*np.pi, 1000)
-            else:
-                self.times = np.linspace(np.pi/4, np.pi/2., 125)
+        elif self.fid is True:
+            self.radial = self.radialFID
+            self.angular = self.angularFID
         self.calculateCoherence()
         if first:
             self.signals.create_visualization.emit()
@@ -540,14 +540,16 @@ class OrbitalCalculator(QtCore.QMutex):
         '''Update the visualization when a new orbital is selected.'''
         if self.mode == 'Stationary States':
             self.changeStationary()
+            self.animation_timer.timeout.connect(self.runStationary)
         elif self.mode == 'Coerences':
             self.changeCoherence()
+            self.animation_timer.timeout.connect(self.runCoherence)
 
     def animateClicked(self):
         '''Start or stop the animation'''
         if not self.animating:
             self.zoom.write(False) # Zooming during animations is disorienting
-            self.animation_timer.start(25)
+            self.animation_timer.start(100)
             self.animating = True
         else:
             self.animation_timer.stop()
@@ -566,7 +568,7 @@ class OrbitalCalculator(QtCore.QMutex):
     def calculateStationary(self):
         time = self.times[self.i % len(self.times)]
         psi = np.angle(self.orbital.angular(self.theta, self.phi) *
-                       np.exp(1j * self.orbital.bohr * time))
+                       np.exp(2j * time))
         data = (self.rs*self.x, self.rs*self.y, self.rs*self.z, psi)
         self.points.writePoints(data)
 
@@ -574,9 +576,6 @@ class OrbitalCalculator(QtCore.QMutex):
         self.calculateCoherence()
         self.signals.update_visualization.emit()
         self.i = self.i + 1
-        if not self.mode == 'Coherences':
-            self.animating = False
-            self.animation_timer.stop()
 
     def calculateCoherence(self):
         t = self.times[self.i % len(self.times)]
@@ -604,6 +603,19 @@ class OrbitalCalculator(QtCore.QMutex):
         return radius
 
     def angularRabiCycle(self, theta, phi, t):
+        return (np.sin(t) * np.exp(1j*self.ket.bohr*t) *
+                self.ket.angular(theta, phi) +
+                np.cos(t) * np.exp(1j*self.bra.bohr*t) *
+                self.bra.angular(theta, phi))
+
+    def radialFID(self, time):
+        t = time%(np.pi/4)+np.pi/4
+        radius = (np.sin(t)*np.sin(t)*self.ket.r_90p +
+                  np.cos(t)*np.cos(t)*self.bra.r_90p)
+        return radius
+
+    def angularFID(self, theta, phi, time):
+        t = time%(np.pi/4)+np.pi/4
         return (np.sin(t) * np.exp(1j*self.ket.bohr*t) *
                 self.ket.angular(theta, phi) +
                 np.cos(t) * np.exp(1j*self.bra.bohr*t) *
@@ -683,7 +695,7 @@ class SignalBus(QtCore.QObject):
     frame_rendered = QtCore.pyqtSignal()
 
 signals = SignalBus()
-stationary_orbital = OrbitalMutex(orbital = hyd.orbitals['1s'], bohr = 1)
+stationary_orbital = OrbitalMutex(orbital = hyd.orbitals['1s'], bohr = 4)
 bra_orbital = OrbitalMutex(orbital = hyd.orbitals['2pz'], bohr = 50)
 ket_orbital = OrbitalMutex(orbital = hyd.orbitals['1s'], bohr = 10)
 points = PointsMutex()
