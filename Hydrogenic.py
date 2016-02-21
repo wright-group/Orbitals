@@ -38,6 +38,14 @@ d_dict = {'z^2': lambda theta, phi: sqrt(5/pi)/4*(3*cos(phi)*cos(phi)-1),
           -2: lambda theta, phi: sqrt(15/2/pi)/4*exp(-2j*theta)*sin(phi)*sin(phi)
           }
 
+# F orbital names:
+# y^3-3yx^2
+# x^3-3xy^2
+# 5yz^2-yr^2
+# 5xz^2-3xr^2
+# zx^2-zy^2
+# xyz
+# 5z^3-3zr^2
 f_dict = {'z^3': lambda theta, phi: sqrt(7/pi)/4*(5*cos(phi)*cos(phi)*cos(phi)-3*cos(phi)),
           'f1': lambda theta, phi: 1./sqrt2*(sh(1, 3, theta, phi)+sh(-1, 3, theta, phi)),
           'f-1': lambda theta, phi: 1./1j/sqrt2*(sh(1, 3, theta, phi)-sh(-1, 3, theta, phi)),
@@ -90,7 +98,7 @@ class Orbital:
     '''
     A class to represent a hydrogenic orbital
     '''
-    def __init__(self, n, l, m, s=1, z=1):
+    def __init__(self, n, l, m, s=1, z=1, bohr=1):
         '''
         Initialize an instance of Orbital with quantum numbers for complex
         wavefunctions. "2px", for example, will have to be initialized
@@ -105,6 +113,11 @@ class Orbital:
         self.r_90p = get_90p(self.radial)
         self.psi = lambda r, theta, phi: (self.radial(r) *
                                           self.angular(theta, phi))
+        self.bohr = bohr * self.s
+
+    def setBohr(self, bohr):
+        '''Define the bohr oscillation'''
+        self.bohr = bohr * self.s
 
 
 def get_angular(l, m, s):
@@ -131,11 +144,23 @@ def get_angular(l, m, s):
 
 def get_radial(n, l, z):
     '''
-    Return the radial wavefunction for the given n, z, z values
+    Return the radial wavefunction for the given n, z, z values.
+    Performance is improved for the equations which are explicitly written
+    in the dictionary, but as a last resort the Lagrange polynomial is
+    generated programmatically.
     '''
     if n <= 4:
         # Typing in the functions explicitly allows speed optimization
         radial = lambda r: radials["{}{}".format(n, l)](r, z)
+    elif l == n - 1:
+        print("L is N-1")
+        radial = lambda r: r**(n-1)*np.exp(-z*r/n)
+        rvals = np.arange(0,200,0.01)
+        integral = 0
+        for r in rvals:
+            radial_val = radial(r)
+            integral = integral + r*r*radial_val*radial_val/100
+        radial = lambda r: r**(n-1)*np.exp(-z*r/n)/integral
     else:
         # General form for arbitrarily large quantum numbers
         radial = lambda r: r
@@ -199,4 +224,3 @@ orbitals = {'1s': Orbital(1, 0, 0),
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-

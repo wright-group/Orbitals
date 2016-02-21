@@ -23,6 +23,7 @@ import numpy as np
 sqrt2 = np.sqrt(2)
 
 class MainWindow(QtGui.QMainWindow):
+    """ Main Window for the UI"""
     def __init__(self, parent=None):
         QtGui.QMainWindow.__init__(self, parent)
         self.setWindowTitle("Orbitals!")
@@ -36,10 +37,6 @@ class MainWindow(QtGui.QMainWindow):
         self.tabs.setMaximumWidth(550)
         self.tabs.currentChanged.connect(self.changeTab)
         self.left_layout.addWidget(self.tabs)
-        self.animate_button = QtGui.QPushButton(self,
-                                                text='Start/Stop Animation')
-        self.left_layout.addWidget(self.animate_button)
-        self.animate_button.clicked.connect(signals.animate_clicked.emit)
         self.author = AuthorPanel(self)
         self.left_layout.addWidget(self.author)
         self.layout.addLayout(self.left_layout)
@@ -53,11 +50,15 @@ class MainWindow(QtGui.QMainWindow):
         calculator.animation_timer.stop()
 
     def changeTab(self):
+        """A new tab has been selected. It may be necessary to reinitialize
+        the visualization widget"""
         global calculator
         calculator.writeMode(self.tabs.tabText(self.tabs.currentIndex()))
 
 
 class OrbitalsPanel(QtGui.QWidget):
+    """A panel for selecting a hydrogenic orbital, either from a selection
+    of real orbitals or by selecting the quantum numbers"""
     def __init__(self, my_orbital, parent=None):
         QtGui.QWidget.__init__(self, parent)
         self.my_orbital = my_orbital
@@ -167,7 +168,6 @@ class OrbitalsPanel(QtGui.QWidget):
         self.layout.addItem(VerticalSpacer())
 
     def chooseNumbers(self):
-        global signals
         self.my_orbital.writeNumbers([self.n, self.l, self.m, self.s])
         signals.orbital_change.emit()
 
@@ -186,7 +186,7 @@ class OrbitalsPanel(QtGui.QWidget):
 
 class StationaryPanel(QtGui.QWidget):
     def __init__(self, parent=None):
-        global stationary_orbital
+        self.stationary_orbital = OrbitalMutex()
         QtGui.QWidget.__init__(self, parent)
         self.layout = QtGui.QVBoxLayout(self)
         self.inst_button = InstructionsButton(self, my_file='Stationary.txt')
@@ -194,15 +194,20 @@ class StationaryPanel(QtGui.QWidget):
         self.layout.addWidget(HorizontalLine(self))
         self.orbitals = OrbitalsPanel(stationary_orbital, self)
         self.layout.addWidget(self.orbitals)
+        self.animate_button = QtGui.QPushButton(self,
+                                                text='Start/Stop Animation')
+        self.layout.addWidget(self.animate_button)
+        self.animate_button.clicked.connect(signals.animate_orbital.emit)
 
 
 class CoherencePanel(QtGui.QWidget):
     def __init__(self, parent=None, state=None):
-        global ket_orbital, bra_orbital, signals
+        global ket_orbital, bra_orbital, signals, cycle
         QtGui.QWidget.__init__(self, parent)
         self.layout = QtGui.QVBoxLayout(self)
         self.options = QtGui.QHBoxLayout()
         self.coherence = QtGui.QRadioButton(self, text='Show Coherence')
+        self.coherence.setChecked(True)
         self.options.addWidget(self.coherence)
         self.rabi = QtGui.QRadioButton(self, text='Show Rabi Cycle')
         self.options.addWidget(self.rabi)
@@ -229,6 +234,19 @@ class CoherencePanel(QtGui.QWidget):
         self.functions.addWidget(VerticalLine())
         self.functions.addLayout(self.bra_layout)
         self.layout.addLayout(self.functions)
+        self.animate_button = QtGui.QPushButton(self,
+                                                text='Start/Stop Animation')
+        self.layout.addWidget(self.animate_button)
+        self.animate_button.clicked.connect(signals.animate_orbital.emit)
+        self.rabi.clicked.connect(self.changeCycle)
+        self.fid.clicked.connect(self.changeCycle)
+        self.coherence.clicked.connect(self.changeCycle)
+
+    def changeCycle(self):
+        cycle_vals = [self.coherence.isChecked(), self.rabi.isChecked(),
+                      self.fid.isChecked()]
+        cycle.write(cycle_vals)
+        signals.cycle_change.emit()
 
 
 class CrossingPanel(QtGui.QWidget):
@@ -416,6 +434,7 @@ class MayaviQWidget(QtGui.QWidget):
         layout.addWidget(self.ui)
         self.ui.setParent(self)
         signals.update_visualization.connect(self.visualization.updatePoints)
+        signals.create_visualization.connect(self.visualization.createPlot)
 
 
 class OrbitalCalculator(QtCore.QMutex):
@@ -423,119 +442,182 @@ class OrbitalCalculator(QtCore.QMutex):
     Calculates the appropriate surface to graph for stationary states
     and coherences. Avoided crossings are handled separately.
     '''
-    def __init__(self, stationary_orbital, ket_orbital, bra_orbital):
-        global signals
+    def __init__(self, stationary_orbital, ket_orbital, bra_orbital,
+                 signals, zoom, points):
         QtCore.QMutex.__init__(self)
         self.stationary_orbital = stationary_orbital
         self.ket_orbital = ket_orbital
         self.bra_orbital = bra_orbital
+        self.times = np.linspace(0, 2*np.pi, 50)
+        self.signals = signals
+        self.zoom = zoom
+        self.points = points
         self.mode = 'Stationary States'
+        self.coherence = True
         self.rabi = False
+        self.fid = False
         self.animating = False
+        self.i = 0
         self.phi, self.theta = np.mgrid[0:np.pi:50j, 0:2*np.pi:100j]
-        signals.orbital_change.connect(self.orbitalChange)
-        signals.animate_clicked.connect(self.setupAnimation)
-        self.orbitalChange()
+        self.signals.orbital_change.connect(self.orbitalChange)
+        self.signals.animate_orbital.connect(self.animateClicked)
+        self.signals.cycle_change.connect(self.cycleChanged)
         self.animation_timer = QtCore.QTimer()
-        self.animation_timer.timeout.connect(self.runAnimation)
+        self.animation_timer.timeout.connect(self.runStationary)
+        self.orbitalChange()
 
     def writeMode(self, new_mode):
         '''
         Set the variable which keeps track of which tab is currently selected
         '''
-        self.lock()
+        #self.lock()
+        self.animation_timer.stop()
+        self.animating = False
         self.mode = new_mode
-        self.unlock()
-
-    def orbitalChange(self):
-        global signals, points
         if self.mode == 'Stationary States':
-            orbital = self.stationary_orbital.read()
-            r = orbital.r_90p
-            x = r * np.sin(self.phi) * np.cos(self.theta)
-            y = r * np.sin(self.phi) * np.sin(self.theta)
-            z = r * np.cos(self.phi)
-            rs = (np.conj(orbital.angular(self.theta, self.phi)) *
-                  orbital.angular(self.theta, self.phi)).real
-            psi = np.angle(orbital.angular(self.theta, self.phi))
-            data = (rs*x, rs*y, rs*z, psi)
-            points.writePoints(data)
-            zoom.write(True)
-            signals.update_visualization.emit()
+            self.stationaryMode()
+        elif self.mode == 'Coherences':
+            self.coherencesMode()
+        elif self.mode == 'Avoided Crossing':
+            self.crossingsMode()
+        #self.unlock()
 
-    def setupAnimation(self):
-        global zoom
-        if not self.animating:
-            self.ket = self.ket_orbital.read()
-            self.bra = self.bra_orbital.read()
-            if self.rabi is False:
-                self.radial = self.radialNoCycle
-                self.angular = self.angularNoCycle
-                self.angularConjugate = self.angularNoCycleConjugate
+    def stationaryMode(self):
+        '''Prepare the visualization for stationary states mode'''
+        self.animation_timer.timeout.connect(self.runStationary)
+        self.times = np.linspace(0, np.pi, 100)
+        self.changeStationary(first=True)
+
+    def coherencesMode(self):
+        '''Prepare the visualization for coherences mode'''
+        self.animation_timer.timeout.connect(self.runCoherence)
+        self.zoom.write(False)
+        self.changeCoherence(first=True)
+
+    def crossingsMode(self):
+        '''Prepare the visualization for avoided crossings mode'''
+        self.animation_timer.stop()
+        self.animating = False
+
+    def changeStationary(self, first=False):
+        '''Update the visualization when a new orbital is selected.'''
+        self.orbital = self.stationary_orbital.read()
+        self.r = self.orbital.r_90p
+        self.x = self.r * np.sin(self.phi) * np.cos(self.theta)
+        self.y = self.r * np.sin(self.phi) * np.sin(self.theta)
+        self.z = self.r * np.cos(self.phi)
+        self.rs = np.sqrt((np.conj(self.orbital.angular(self.theta, self.phi)) *
+                           self.orbital.angular(self.theta, self.phi)).real)
+        self.calculateStationary()
+        if first:
+            self.signals.create_visualization.emit()
+        else:
+            self.signals.update_visualization.emit()
+            self.zoom.write(True)
+
+    def changeCoherence(self, first=False):
+        '''Update the visualization when a new orbital is selected.'''
+        self.ket = self.ket_orbital.read()
+        self.bra = self.bra_orbital.read()
+        if self.coherence is True:
+            self.times = np.linspace(0, 2*np.pi, 1000)
+            self.radial = self.radialNoCycle
+            self.angular = self.angularNoCycle
+        else:
+            self.radial = self.radialRabiCycle
+            self.angular = self.angularRabiCycle
+            if self.rabi is True:
                 self.times = np.linspace(0, 2*np.pi, 1000)
             else:
-                self.radial = self.radialRabiCycle
-                self.angular = self.angularRabiCycle
-                self.angular = self.angularRabiCycleConjugate
-                self.times = np.linspace(0, 2*np.pi, 400)
-            self.i = 0
+                self.times = np.linspace(np.pi/4, np.pi/2., 125)
+        self.calculateCoherence()
+        if first:
+            self.signals.create_visualization.emit()
+        else:
+            self.signals.update_visualization.emit()
+
+    def orbitalChange(self):
+        '''Update the visualization when a new orbital is selected.'''
+        if self.mode == 'Stationary States':
+            self.changeStationary()
+        elif self.mode == 'Coerences':
+            self.changeCoherence()
+
+    def animateClicked(self):
+        '''Start or stop the animation'''
+        if not self.animating:
+            self.zoom.write(False) # Zooming during animations is disorienting
             self.animation_timer.start(25)
             self.animating = True
-            zoom.write(False)
         else:
             self.animation_timer.stop()
             self.animating = False
 
-    def runAnimation(self):
-        global zoom
-        t = self.times[self.i % len(self.times)]
-        r = self.radial(t)
-        x = r * np.sin(self.phi) * np.cos(self.theta)
-        y = r * np.sin(self.phi) * np.sin(self.theta)
-        z = r * np.cos(self.phi)
-        rs = (self.angularConjugate(self.theta, self.phi, t) *
-              self.angular(self.theta, self.phi, t)).real
-        psi = np.angle(self.angular(self.theta, self.phi, t))
-        data = (rs*x, rs*y, rs*z, psi)
-        points.writePoints(data)
-        signals.update_visualization.emit()
+    def cycleChanged(self):
+        cycle_vals = cycle.read()
+        self.coherence, self.rabi, self.fid = cycle_vals
+        self.changeCoherence()
+
+    def runStationary(self):
+        self.calculateStationary()
+        self.i = self.i + 1
+        self.signals.update_visualization.emit()
+
+    def calculateStationary(self):
+        time = self.times[self.i % len(self.times)]
+        psi = np.angle(self.orbital.angular(self.theta, self.phi) *
+                       np.exp(1j * self.orbital.bohr * time))
+        data = (self.rs*self.x, self.rs*self.y, self.rs*self.z, psi)
+        self.points.writePoints(data)
+
+    def runCoherence(self):
+        self.calculateCoherence()
+        self.signals.update_visualization.emit()
         self.i = self.i + 1
         if not self.mode == 'Coherences':
             self.animating = False
             self.animation_timer.stop()
 
+    def calculateCoherence(self):
+        t = self.times[self.i % len(self.times)]
+        r = self.radial(t)
+        x = r * np.sin(self.phi) * np.cos(self.theta)
+        y = r * np.sin(self.phi) * np.sin(self.theta)
+        z = r * np.cos(self.phi)
+        angular = self.angular(self.theta, self.phi, t)
+        rs = np.sqrt((np.conj(angular) * angular).real)
+        psi = np.angle(angular)
+        data = (rs*x, rs*y, rs*z, psi)
+        self.points.writePoints(data)
+
     def radialNoCycle(self, t):
-        return 0.5/sqrt2*(self.ket.r_90p + self.bra.r_90p)
+        radius = 0.5/sqrt2*(self.ket.r_90p + self.bra.r_90p)
+        return radius
 
     def angularNoCycle(self, theta, phi, t):
-        print(np.sin(t)*np.sin(t), np.cos(t)*np.cos(t))
-        return (np.exp(1j*3*t)*self.ket.angular(theta, phi) +
-                np.exp(1j*1*t)*self.bra.angular(theta, phi))
+        return (np.exp(1j*self.ket.bohr*t) * self.ket.angular(theta, phi) +
+                np.exp(1j*self.bra.bohr*t) * self.bra.angular(theta, phi))
 
-    def angularNoCycleConjugate(self, theta, phi, t):
-        return (np.exp(-1*1j*3*t)*self.ket.angular(theta, phi) +
-                np.exp(-1*1j*1*t)*self.bra.angular(theta, phi))
+    def radialRabiCycle(self, t):
+        radius = (np.sin(t)*np.sin(t)*self.ket.r_90p +
+                  np.cos(t)*np.cos(t)*self.bra.r_90p)
+        return radius
 
-    def radialNoCycle(self, t):
-        return 1.5/sqrt2*(np.sin(t)*np.sin(t)*self.ket.r_90p +
-                        np.cos(t)*np.cos(t)*self.bra.r_90p)
-
-    def angularNoCycle(self, theta, phi, t):
-        return (np.sin(t)*np.exp(1j*50*t)*self.ket.angular(theta, phi) +
-                np.cos(t)*np.exp(1j*1*t)*self.bra.angular(theta, phi))
-
-    def angularNoCycleConjugate(self, theta, phi, t):
-        return (np.sin(t)*np.exp(-1*1j*50*t)*self.ket.angular(theta, phi) +
-                np.cos(t)*np.exp(-1*1j*1*t)*self.bra.angular(theta, phi))
-
+    def angularRabiCycle(self, theta, phi, t):
+        return (np.sin(t) * np.exp(1j*self.ket.bohr*t) *
+                self.ket.angular(theta, phi) +
+                np.cos(t) * np.exp(1j*self.bra.bohr*t) *
+                self.bra.angular(theta, phi))
 
 class OrbitalMutex(QtCore.QMutex):
     '''
     Stores a Hydrogenic.Orbital object
     '''
-    def __init__(self):
+    def __init__(self, orbital = hyd.orbitals['2pz'], bohr = 1):
         QtCore.QMutex.__init__(self)
-        self.orbital = hyd.orbitals['2pz']
+        self.bohr = bohr
+        self.orbital = orbital
+        self.orbital.setBohr(self.bohr)
 
     def read(self):
         return self.orbital
@@ -543,6 +625,7 @@ class OrbitalMutex(QtCore.QMutex):
     def writeName(self, new_name):
         self.lock()
         self.orbital = hyd.orbitals[new_name]
+        self.orbital.setBohr(self.bohr)
         self.unlock()
 
     def writeNumbers(self, new_numbers):
@@ -552,6 +635,7 @@ class OrbitalMutex(QtCore.QMutex):
         m = new_numbers[2]
         s = new_numbers[3]
         self.orbital = hyd.Orbital(n, l, m, s)
+        self.orbital.setBohr(self.bohr)
         self.unlock()
 
 
@@ -587,22 +671,26 @@ class BoolMutex(QtCore.QMutex):
         self.value = new_value
         self.unlock()
 
-class Signals(QtCore.QObject):
+class SignalBus(QtCore.QObject):
     '''
     A QObject that holds all the pyqtSignals
     '''
     orbital_change = QtCore.pyqtSignal()
-    animate_clicked = QtCore.pyqtSignal()
+    cycle_change = QtCore.pyqtSignal()
+    animate_orbital = QtCore.pyqtSignal()
+    create_visualization = QtCore.pyqtSignal()
     update_visualization = QtCore.pyqtSignal()
     frame_rendered = QtCore.pyqtSignal()
 
-signals = Signals()
-stationary_orbital = OrbitalMutex()
-bra_orbital = OrbitalMutex()
-ket_orbital = OrbitalMutex()
+signals = SignalBus()
+stationary_orbital = OrbitalMutex(orbital = hyd.orbitals['1s'], bohr = 1)
+bra_orbital = OrbitalMutex(orbital = hyd.orbitals['2pz'], bohr = 50)
+ket_orbital = OrbitalMutex(orbital = hyd.orbitals['1s'], bohr = 10)
 points = PointsMutex()
 zoom = BoolMutex(init_value=True)
-calculator = OrbitalCalculator(stationary_orbital, ket_orbital, bra_orbital)
+cycle = BoolMutex(init_value=[True,False,False])
+calculator = OrbitalCalculator(stationary_orbital, ket_orbital, bra_orbital,
+                               signals, zoom, points)
 
 # The MIT License (MIT)
 #
