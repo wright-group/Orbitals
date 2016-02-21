@@ -399,7 +399,8 @@ class Visualization(HasTraits):
         self.fig = self.scene.mlab.gcf()
         self.source = self.mesh.mlab_source
         self.scene.mlab.view(0, 90, np.max((x, y, z))*5, (0, 0, 0))
-        self.scene.reset_zoom()
+        if zoom.read():
+            self.scene.reset_zoom()
 
     # the layout of the dialog screated
     view = View(Item('scene', editor=SceneEditor(scene_class=MayaviScene),
@@ -474,6 +475,7 @@ class OrbitalCalculator(QtCore.QMutex):
         self.animation_timer.stop()
         self.animating = False
         self.mode = new_mode
+        self.animation_timer = QtCore.QTimer()
         if self.mode == 'Stationary States':
             self.stationaryMode()
         elif self.mode == 'Coherences':
@@ -485,7 +487,7 @@ class OrbitalCalculator(QtCore.QMutex):
     def stationaryMode(self):
         '''Prepare the visualization for stationary states mode'''
         self.animation_timer.timeout.connect(self.runStationary)
-        self.times = np.linspace(0, np.pi, 100)
+        self.times = np.linspace(0, 2*np.pi, 50)
         self.changeStationary(first=True)
 
     def coherencesMode(self):
@@ -540,13 +542,13 @@ class OrbitalCalculator(QtCore.QMutex):
         '''Update the visualization when a new orbital is selected.'''
         if self.mode == 'Stationary States':
             self.changeStationary()
-        elif self.mode == 'Coerences':
+        elif self.mode == 'Coherences':
             self.changeCoherence()
 
     def animateClicked(self):
         '''Start or stop the animation'''
         if not self.animating:
-            self.zoom.write(False) # Zooming during animations is disorienting
+            self.zoom.write(False)  # Zooming during animations is disorienting
             self.animation_timer.start(25)
             self.animating = True
         else:
@@ -574,9 +576,6 @@ class OrbitalCalculator(QtCore.QMutex):
         self.calculateCoherence()
         self.signals.update_visualization.emit()
         self.i = self.i + 1
-        if not self.mode == 'Coherences':
-            self.animating = False
-            self.animation_timer.stop()
 
     def calculateCoherence(self):
         t = self.times[self.i % len(self.times)]
