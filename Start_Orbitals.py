@@ -6,7 +6,6 @@ Created on Thu Jun 11 13:38:01 2015
 
 @author: Matt B Rowley
 """
-import sys
 from pyface.qt import QtGui, QtCore
 import Orbitals_UI
 import os

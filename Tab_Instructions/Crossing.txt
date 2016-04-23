@@ -1,0 +1,4 @@
+Instructions for the Avoided Crossing Tab
+Avoided Crossing
+An avoided crossing can illustrate the consequences of the breakdown of
+the Born-Oppenheimer approximation.

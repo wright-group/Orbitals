@@ -8,7 +8,7 @@ hydrogenic wavefunctions.
 
 @author: Matthew B Rowley
 """
-
+from __future__ import division
 import os
 # This must be called before importing traits and mayavi elements
 os.environ['ETS_TOOLKIT'] = 'qt4'
@@ -18,6 +18,8 @@ from traitsui.api import View, Item
 from mayavi.core.ui.api import MayaviScene, MlabSceneModel, SceneEditor
 import Hydrogenic as hyd
 import numpy as np
+import pyqtgraph as pg
+import pickle
 #os.environ['ETS_TOOLKIT'] = 'qt4'
 
 sqrt2 = np.sqrt(2)
@@ -33,7 +35,8 @@ class MainWindow(QtGui.QMainWindow):
         self.tabs = QtGui.QTabWidget(self, )
         self.tabs.addTab(StationaryPanel(self), 'Stationary States')
         self.tabs.addTab(CoherencePanel(self), 'Coherences')
-        self.tabs.addTab(CrossingPanel(self), 'Avoided Crossing')
+        self.cross_tab = CrossingPanel(self)
+        self.tabs.addTab(self.cross_tab, 'Avoided Crossing')
         self.tabs.setMaximumWidth(550)
         self.tabs.currentChanged.connect(self.changeTab)
         self.left_layout.addWidget(self.tabs)
@@ -43,6 +46,7 @@ class MainWindow(QtGui.QMainWindow):
         self.mayavi_widget = MayaviQWidget(self.frame)
         self.layout.addWidget(self.mayavi_widget)
         self.setCentralWidget(self.frame)
+        self.changeTab()  # Create the visualization after the UI is made
 
     def closeEvent(self, evt):
         global calculator
@@ -54,6 +58,7 @@ class MainWindow(QtGui.QMainWindow):
         the visualization widget"""
         global calculator
         calculator.writeMode(self.tabs.tabText(self.tabs.currentIndex()))
+        self.cross_tab.tabChange(self.tabs.tabText(self.tabs.currentIndex()))
 
 
 class OrbitalsPanel(QtGui.QWidget):
@@ -62,8 +67,8 @@ class OrbitalsPanel(QtGui.QWidget):
     def __init__(self, my_orbital, parent=None):
         QtGui.QWidget.__init__(self, parent)
         self.my_orbital = my_orbital
-        self.n = 0
-        self.l = 0
+        self.n = 2
+        self.l = 1
         self.m = 0
         self.s = 1
         self.layout = QtGui.QVBoxLayout(self)
@@ -122,9 +127,31 @@ class OrbitalsPanel(QtGui.QWidget):
         self.real.addLayout(self.d3_layout2)
         self.real.addWidget(CenteredLine(self))
         self.f4_layout = QtGui.QHBoxLayout()
+        self.f4_layout.addItem(HorizontalSpacer())
+        self.f4z3 = OrbitalButton(self.my_orbital, self, text='4fz^3')
+        self.f4_layout.addWidget(self.f4z3)
+        self.f4xz2 = OrbitalButton(self.my_orbital, self, text='4fxz^2')
+        self.f4_layout.addWidget(self.f4xz2)
+        self.f4yz2 = OrbitalButton(self.my_orbital, self, text='4fyz^2')
+        self.f4_layout.addWidget(self.f4yz2)
+        self.f4_layout.addItem(HorizontalSpacer())
         self.real.addLayout(self.f4_layout)
         self.f4_layout2 = QtGui.QHBoxLayout()
+        self.f4_layout2.addItem(HorizontalSpacer())
+        self.f4xyz = OrbitalButton(self.my_orbital, self, text='4fxyz')
+        self.f4_layout2.addWidget(self.f4xyz)
+        self.f4zx2y2 = OrbitalButton(self.my_orbital, self, text='4fz(x^2-y^2)')
+        self.f4_layout2.addWidget(self.f4zx2y2)
+        self.f4_layout2.addItem(HorizontalSpacer())
         self.real.addLayout(self.f4_layout2)
+        self.f4_layout3 = QtGui.QHBoxLayout()
+        self.f4_layout3.addItem(HorizontalSpacer())
+        self.f4xx23y2 = OrbitalButton(self.my_orbital, self, text='4fx(x^2-3y^2)')
+        self.f4_layout3.addWidget(self.f4xx23y2)
+        self.f4zy3x2y2 = OrbitalButton(self.my_orbital, self, text='4fy(3x^2-y^2)')
+        self.f4_layout3.addWidget(self.f4zy3x2y2)
+        self.f4_layout3.addItem(HorizontalSpacer())
+        self.real.addLayout(self.f4_layout3)
         self.real.addItem(VerticalSpacer())
         self.layout.addLayout(self.real)
         self.layout.addWidget(HorizontalLine(self))
@@ -218,14 +245,14 @@ class CoherencePanel(QtGui.QWidget):
         self.layout.addLayout(self.options)
         self.functions = QtGui.QHBoxLayout()
         self.ket_layout = QtGui.QVBoxLayout()
-        self.ket_label = QtGui.QLabel(self, text='|ket>')
+        self.ket_label = QtGui.QLabel(self, text='Lower State    |ket>')
         self.ket_label.setAlignment(QtCore.Qt.AlignRight)
         self.ket_layout.addWidget(self.ket_label)
         self.ket_layout.addWidget(HorizontalLine())
         self.ket_orbitals = OrbitalsPanel(ket_orbital, self)
         self.ket_layout.addWidget(self.ket_orbitals)
         self.bra_layout = QtGui.QVBoxLayout()
-        self.bra_label = QtGui.QLabel(self, text='<bra|')
+        self.bra_label = QtGui.QLabel(self, text='<bra|    Upper State')
         self.bra_layout.addWidget(self.bra_label)
         self.bra_layout.addWidget(HorizontalLine())
         self.bra_orbitals = OrbitalsPanel(bra_orbital, self)
@@ -250,16 +277,141 @@ class CoherencePanel(QtGui.QWidget):
 
 
 class CrossingPanel(QtGui.QWidget):
+    '''
+    A panel for displaying the energy curves and wavefunctions involved
+    in photodissociation with an avoided crossing.
+
+    Because these animations are much different from the others, everything
+    is self-contained in this class rather than trying to unify it with the
+    OrbitalCalculator class.
+    '''
     def __init__(self, parent=None):
         QtGui.QWidget.__init__(self, parent)
+        # Get the data for the avoided crossing
+        pickle_foldername = os.path.join(os.getcwd(),'Crossings_Data')
+        pickle_filename = os.path.join(pickle_foldername, 'pickled_data.p')
+        with open(pickle_filename, 'r') as file:
+            pickled_data = pickle.load(file)
+        self.bond_lengths = pickled_data['bond_lengths']
+        self.Low_A_Curve = pickled_data['Low_A_Curve']
+        self.High_A_Curve = pickled_data['High_A_Curve']
+        self.Low_D_Curve = pickled_data['Low_D_Curve']
+        self.High_D_Curve = pickled_data['High_D_Curve']
+        self.Low_A_MO = pickled_data['Low_A_MO']
+        self.High_A_MO = pickled_data['High_A_MO']
+        self.Low_D_MO = pickled_data['Low_D_MO']
+        self.High_D_MO = pickled_data['High_D_MO']
+        self.a_curves = True
+        # Now set up the GUI
         self.layout = QtGui.QVBoxLayout(self)
-        self.inst_text = '''Avoided Crossing -
-        An avoided crossing can illustrate the consequences of the breakdown of
-        the Born-Oppenheimer approximation.'''
-        self.instructions = QtGui.QLabel(self, text=self.inst_text)
-        self.layout.addWidget(self.instructions)
-        self.layout.addWidget(HorizontalLine(self))
+        self.options = QtGui.QHBoxLayout()
+        self.adiabat = QtGui.QRadioButton(self, text='Adiabatic Curves')
+        self.adiabat.setChecked(True)
+        self.options.addWidget(self.adiabat)
+        self.adiabat.clicked.connect(self.changeCurves)
+        self.diabat = QtGui.QRadioButton(self, text='Diabatic Curves')
+        self.options.addWidget(self.diabat)
+        self.diabat.clicked.connect(self.changeCurves)
+        self.i_button = InstructionsButton(self, my_file='Crossing.txt')
+        self.options.addWidget(self.i_button)
+        self.layout.addLayout(self.options)
+        self.plot_object = pg.PlotWidget()
+        self.plot_object.getPlotItem().setMouseEnabled(False, False)
+        self.plot_object.setLabel('bottom', 'Bond Length', units='α')
+        self.plot_object.setLabel('left', 'Energy')
+        self.plot_object.hideAxis('left')
+        # Create and add things to the plot widget
+        self.curve_AH = pg.PlotCurveItem(pen=(30, 100))
+        self.curve_AH.setData(self.bond_lengths, self.High_A_Curve)
+        self.plot_object.addItem(self.curve_AH)
+        self.curve_AL = pg.PlotCurveItem(pen=(20, 100))
+        self.curve_AL.setData(self.bond_lengths, self.Low_A_Curve)
+        self.plot_object.addItem(self.curve_AL)
+        self.curve_DH = pg.PlotCurveItem(pen=(90, 100))
+        self.curve_DH.setData(self.bond_lengths, self.High_D_Curve)
+        self.plot_object.addItem(self.curve_DH)
+        self.curve_DL = pg.PlotCurveItem(pen=(80, 100))
+        self.curve_DL.setData(self.bond_lengths, self.Low_D_Curve)
+        self.plot_object.addItem(self.curve_DL)
+        self.curser = pg.InfiniteLine(pos=0, angle=90, bounds=[1.5,5.0],
+                                      pen=pg.mkPen(width=3, color='g'),
+                                      movable=True)
+        self.curser.sigPositionChanged.connect(self.curserMoved)
+        self.plot_object.addItem(self.curser)
+        self.layout.addWidget(self.plot_object)
         self.layout.addItem(VerticalSpacer())
+        self.animate_button = QtGui.QPushButton(self,
+                                                text='Start/Stop Animation')
+        self.layout.addWidget(self.animate_button)
+        self.animate_button.clicked.connect(self.animationPressed)
+        self.animating = False
+        self.animation_timer = QtCore.QTimer()
+        self.animation_timer.timeout.connect(self.animateFrame)
+        self.vid_frame = 0
+
+    def changeCurves(self):
+        if self.adiabat.isChecked():
+            self.a_curves = True
+        else:
+            self.a_curves = False
+        self.renderFrame()
+
+    def tabChange(self, tab):
+        if tab == 'Avoided Crossing':
+            self.vid_frame = 0
+            zoom.write(True)
+            self.preparePoints()
+            signals.create_crossing.emit()
+        else:
+            if self.animating:
+                self.animation_timer.stop()
+                self.animating = False
+                self.curser.sigPositionChanged.connect(self.curserMoved)
+
+    def curserMoved(self):
+        if self.animating:
+            self.animating = False
+            self.animation_timer.stop()
+        position = self.curser.getPos()[0]
+        for i in range(100):
+            if self.bond_lengths[i] >= position:
+                self.vid_frame = i
+                break
+        self.preparePoints()
+        self.renderFrame()
+
+    def preparePoints(self):
+        i = self.vid_frame
+        if self.a_curves:
+            data = (self.bond_lengths[i], self.Low_A_MO[i],
+                    self.High_A_MO[i])
+        else:
+            data = (self.bond_lengths[i], self.Low_D_MO[i],
+                    self.High_D_MO[i])
+        points.writePoints((data))
+
+    def animateFrame(self):
+        self.renderFrame()
+        self.curser.setValue(self.bond_lengths[self.vid_frame])
+        self.vid_frame = self.vid_frame + 1
+        if(self.vid_frame >= 100):
+            self.animationPressed()
+
+    def renderFrame(self):
+        self.preparePoints()
+        signals.update_crossing.emit()
+
+    def animationPressed(self):
+        if self.animating:
+            self.animating = False
+            self.animation_timer.stop()
+            self.curser.sigPositionChanged.connect(self.curserMoved)
+        else:
+            if(self.vid_frame >= 100):
+                self.vid_frame = 0
+            self.curser.sigPositionChanged.disconnect()
+            self.animation_timer.start(50)
+            self.animating = True
 
 
 class AuthorPanel(QtGui.QWidget):
@@ -369,7 +521,6 @@ class InstructionsDialog(QtGui.QDialog):
         self.show()
 
     def closeWindow(self):
-        print("Close Clicked")
         self.close()
 
 
@@ -378,37 +529,31 @@ class Visualization(HasTraits):
     Mayavi visualization
     '''
     scene = Instance(MlabSceneModel, ())
-
-    @on_trait_change('scene.activated')
-    def createPlot(self):
-        # This function is called when the view is opened. We don't
-        # populate the scene when the view is not yet open, as some
-        # VTK features require a GLContext.
-
-        # We can do normal mlab calls on the embedded scene.
-        global points
-        self.scene.mlab.clf()
-        x, y, z, psi = points.readPoints()
-        self.mesh = self.scene.mlab.mesh(x, y, z, scalars=psi, colormap='jet',
-                                         vmax=np.pi, vmin=-np.pi)
-        my_map = [[255, 0, 0, 255], [140, 0, 140, 255], [140, 0, 140, 255],
-                  [0, 0, 255, 255], [0, 0, 255, 255], [255, 153, 18, 255],
-                  [255, 153, 18, 255], [255, 0, 0, 255]]
-        self.mesh.module_manager.scalar_lut_manager.lut.table = my_map
-        self.axes = self.scene.mlab.axes()
-        self.fig = self.scene.mlab.gcf()
-        self.source = self.mesh.mlab_source
-        self.scene.mlab.view(0, 90, np.max((x, y, z))*5, (0, 0, 0))
-        if zoom.read():
-            self.scene.reset_zoom()
-
-    # the layout of the dialog screated
     view = View(Item('scene', editor=SceneEditor(scene_class=MayaviScene),
                      height=250, width=300, show_label=False),
                 resizable=True  # We need this to resize with the parent widget
                 )
 
-    def updatePoints(self):
+    def createOrbital(self):
+        global points
+        self.scene.mlab.clf()
+        x, y, z, psi = points.readPoints()
+        self.mesh = self.scene.mlab.mesh(x, y, z, scalars=psi, colormap='hsv',
+                                         vmax=np.pi, vmin=-np.pi)
+        # This low res colormap is simpler and less distracting
+        my_map = [[255, 0, 0, 255], [140, 0, 140, 255], [140, 0, 140, 255],
+                  [0, 0, 255, 255], [0, 0, 255, 255], [255, 153, 18, 255],
+                  [255, 153, 18, 255], [255, 0, 0, 255]]
+        # Comment out the next line to use a smoother high res colormap
+        self.mesh.module_manager.scalar_lut_manager.lut.table = my_map
+        self.axes = self.scene.mlab.axes()
+        self.fig = self.scene.mlab.gcf()
+        self.source = self.mesh.mlab_source
+        if zoom.read():
+            self.scene.mlab.view(0, 90, np.max((x, y, z))*5, (0, 0, 0))
+            self.scene.reset_zoom()
+
+    def updateOrbital(self):
         global points, zoom
         x, y, z, psi = points.readPoints()
         self.source.set(x=x, y=y, z=z, scalars=psi)
@@ -416,7 +561,37 @@ class Visualization(HasTraits):
             self.scene.reset_zoom()
         self.axes.remove()
         self.axes = self.scene.mlab.axes()
-        #zoom.write(False)
+
+    def createCrossing(self):
+        self.scene.mlab.clf()
+        bond_length, Low, High = points.readPoints()
+        self.High_mesh = self.scene.mlab.mesh(High[0], High[1], High[2],
+                                              color=(.9,.1,.1), opacity=0.95)
+        self.Low_mesh = self.scene.mlab.mesh(Low[0], Low[1], Low[2],
+                                             color=(.1,.1,.9), opacity=0.95)
+        self.Cl_point = self.scene.mlab.points3d(0, 0, 0, resolution = 12,
+                                                 color=(0,1,0))
+        self.Br_point = self.scene.mlab.points3d(0., 0., 1.5,
+                                                 resolution = 12,
+                                                 color=(0.6,0.4,0.7))
+        self.axes = self.scene.mlab.axes()
+        self.fig = self.scene.mlab.gcf()
+        self.Br_source = self.Br_point.mlab_source
+        self.Low_source = self.Low_mesh.mlab_source
+        self.High_source = self.High_mesh.mlab_source
+        self.scene.mlab.view(0, 90, roll=0, focalpoint=(0, 0, 0))
+        if zoom.read():
+            self.scene.reset_zoom()
+
+    def updateCrossing(self):
+        bond_length, Low, High = points.readPoints()
+        self.Low_source.set(x=Low[0], y=Low[1], z=Low[2])
+        self.High_source.set(x=High[0], y=High[1], z=High[2])
+        self.Br_source.set(x=0, y=0, z=bond_length)
+        if zoom.read():
+            self.scene.reset_zoom()
+        self.axes.remove()
+        self.axes = self.scene.mlab.axes()
 
 
 class MayaviQWidget(QtGui.QWidget):
@@ -434,22 +609,24 @@ class MayaviQWidget(QtGui.QWidget):
                                                  kind='subpanel').control
         layout.addWidget(self.ui)
         self.ui.setParent(self)
-        signals.update_visualization.connect(self.visualization.updatePoints)
-        signals.create_visualization.connect(self.visualization.createPlot)
+        signals.update_orbital.connect(self.visualization.updateOrbital)
+        signals.create_orbital.connect(self.visualization.createOrbital)
+        signals.update_crossing.connect(self.visualization.updateCrossing)
+        signals.create_crossing.connect(self.visualization.createCrossing)
 
 
-class OrbitalCalculator(QtCore.QMutex):
+class OrbitalCalculator(object):
     '''
     Calculates the appropriate surface to graph for stationary states
     and coherences. Avoided crossings are handled separately.
     '''
     def __init__(self, stationary_orbital, ket_orbital, bra_orbital,
                  signals, zoom, points):
-        QtCore.QMutex.__init__(self)
+        object.__init__(self)
         self.stationary_orbital = stationary_orbital
         self.ket_orbital = ket_orbital
         self.bra_orbital = bra_orbital
-        self.times = np.linspace(0, 2*np.pi, 50)
+        self.times = np.linspace(0, 2*np.pi, 100)
         self.signals = signals
         self.zoom = zoom
         self.points = points
@@ -459,19 +636,17 @@ class OrbitalCalculator(QtCore.QMutex):
         self.fid = False
         self.animating = False
         self.i = 0
-        self.phi, self.theta = np.mgrid[0:np.pi:50j, 0:2*np.pi:100j]
+        self.phi, self.theta = np.mgrid[0:np.pi:40j, 0:2*np.pi:80j]
         self.signals.orbital_change.connect(self.orbitalChange)
         self.signals.animate_orbital.connect(self.animateClicked)
         self.signals.cycle_change.connect(self.cycleChanged)
         self.animation_timer = QtCore.QTimer()
         self.animation_timer.timeout.connect(self.runStationary)
-        self.orbitalChange()
 
     def writeMode(self, new_mode):
         '''
         Set the variable which keeps track of which tab is currently selected
         '''
-        #self.lock()
         self.animation_timer.stop()
         self.animating = False
         self.mode = new_mode
@@ -482,12 +657,11 @@ class OrbitalCalculator(QtCore.QMutex):
             self.coherencesMode()
         elif self.mode == 'Avoided Crossing':
             self.crossingsMode()
-        #self.unlock()
 
     def stationaryMode(self):
         '''Prepare the visualization for stationary states mode'''
         self.animation_timer.timeout.connect(self.runStationary)
-        self.times = np.linspace(0, 2*np.pi, 50)
+        self.times = np.linspace(0, 2*np.pi, 100)
         self.changeStationary(first=True)
 
     def coherencesMode(self):
@@ -511,11 +685,11 @@ class OrbitalCalculator(QtCore.QMutex):
         self.rs = np.sqrt((np.conj(self.orbital.angular(self.theta, self.phi)) *
                            self.orbital.angular(self.theta, self.phi)).real)
         self.calculateStationary()
+        self.zoom.write(True)
         if first:
-            self.signals.create_visualization.emit()
+            self.signals.create_orbital.emit()
         else:
-            self.signals.update_visualization.emit()
-            self.zoom.write(True)
+            self.signals.update_orbital.emit()
 
     def changeCoherence(self, first=False):
         '''Update the visualization when a new orbital is selected.'''
@@ -534,9 +708,9 @@ class OrbitalCalculator(QtCore.QMutex):
                 self.times = np.linspace(np.pi/4, np.pi/2., 125)
         self.calculateCoherence()
         if first:
-            self.signals.create_visualization.emit()
+            self.signals.create_orbital.emit()
         else:
-            self.signals.update_visualization.emit()
+            self.signals.update_orbital.emit()
 
     def orbitalChange(self):
         '''Update the visualization when a new orbital is selected.'''
@@ -549,7 +723,7 @@ class OrbitalCalculator(QtCore.QMutex):
         '''Start or stop the animation'''
         if not self.animating:
             self.zoom.write(False)  # Zooming during animations is disorienting
-            self.animation_timer.start(25)
+            self.animation_timer.start(30)
             self.animating = True
         else:
             self.animation_timer.stop()
@@ -563,7 +737,7 @@ class OrbitalCalculator(QtCore.QMutex):
     def runStationary(self):
         self.calculateStationary()
         self.i = self.i + 1
-        self.signals.update_visualization.emit()
+        self.signals.update_orbital.emit()
 
     def calculateStationary(self):
         time = self.times[self.i % len(self.times)]
@@ -574,7 +748,7 @@ class OrbitalCalculator(QtCore.QMutex):
 
     def runCoherence(self):
         self.calculateCoherence()
-        self.signals.update_visualization.emit()
+        self.signals.update_orbital.emit()
         self.i = self.i + 1
 
     def calculateCoherence(self):
@@ -677,9 +851,12 @@ class SignalBus(QtCore.QObject):
     orbital_change = QtCore.pyqtSignal()
     cycle_change = QtCore.pyqtSignal()
     animate_orbital = QtCore.pyqtSignal()
-    create_visualization = QtCore.pyqtSignal()
-    update_visualization = QtCore.pyqtSignal()
+    create_orbital = QtCore.pyqtSignal()
+    update_orbital = QtCore.pyqtSignal()
     frame_rendered = QtCore.pyqtSignal()
+    create_crossing = QtCore.pyqtSignal()
+    update_crossing = QtCore.pyqtSignal()
+
 
 signals = SignalBus()
 stationary_orbital = OrbitalMutex(orbital = hyd.orbitals['1s'], bohr = 1)

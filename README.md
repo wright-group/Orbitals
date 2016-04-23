@@ -30,9 +30,11 @@ Then run:
   * traits
 
   * traitsui
+  
+  * pyqtgraph
 
 To install dependencies, you may want to use a python package manager, such as pip. For example, try running the following (with the necessary privileges to make changes to your python installation directory):
 
-``pip install PyQt4 scipy numpy mayavi pyface traits traitsui``
+``pip install PyQt4 scipy numpy mayavi pyface traits traitsui pyqtgraph``
 
 Alternatively, you can navigate to the project home page of each dependency and install separately.
