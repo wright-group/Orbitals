@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# This program is licences under an MIT license. Full licence is at the end of
+# This program is licenced under an MIT license. Full licence is at the end of
 # this file.
 """
 Orbitals_UI.py
@@ -636,7 +636,7 @@ class OrbitalCalculator(object):
         self.fid = False
         self.animating = False
         self.i = 0
-        self.phi, self.theta = np.mgrid[0:np.pi:40j, 0:2*np.pi:80j]
+        self.phi, self.theta = np.mgrid[0:np.pi:50j, 0:2*np.pi:100j]
         self.signals.orbital_change.connect(self.orbitalChange)
         self.signals.animate_orbital.connect(self.animateClicked)
         self.signals.cycle_change.connect(self.cycleChanged)
@@ -682,8 +682,9 @@ class OrbitalCalculator(object):
         self.x = self.r * np.sin(self.phi) * np.cos(self.theta)
         self.y = self.r * np.sin(self.phi) * np.sin(self.theta)
         self.z = self.r * np.cos(self.phi)
-        self.rs = np.sqrt((np.conj(self.orbital.angular(self.theta, self.phi)) *
-                           self.orbital.angular(self.theta, self.phi)).real)
+        self.rs = (np.conj(self.orbital.angular(self.theta, self.phi)) *
+                   self.orbital.angular(self.theta, self.phi)).real
+        #self.rs = self.rs / np.max(self.rs) * self.r
         self.calculateStationary()
         self.zoom.write(True)
         if first:
@@ -758,18 +759,19 @@ class OrbitalCalculator(object):
         y = r * np.sin(self.phi) * np.sin(self.theta)
         z = r * np.cos(self.phi)
         angular = self.angular(self.theta, self.phi, t)
-        rs = np.sqrt((np.conj(angular) * angular).real)
+        rs = (np.conj(angular) * angular).real
+        #rs = rs / np.max(rs)
         psi = np.angle(angular)
         data = (rs*x, rs*y, rs*z, psi)
         self.points.writePoints(data)
 
     def radialNoCycle(self, t):
-        radius = 0.5/sqrt2*(self.ket.r_90p + self.bra.r_90p)
+        radius = 0.5*(self.ket.r_90p + self.bra.r_90p)
         return radius
 
     def angularNoCycle(self, theta, phi, t):
-        return (np.exp(1j*self.ket.bohr*t) * self.ket.angular(theta, phi) +
-                np.exp(1j*self.bra.bohr*t) * self.bra.angular(theta, phi))
+        return 0.5*sqrt2*(np.exp(1j*self.ket.bohr*t) * self.ket.angular(theta, phi) +
+                          np.exp(1j*self.bra.bohr*t) * self.bra.angular(theta, phi))
 
     def radialRabiCycle(self, t):
         radius = (np.sin(t)*np.sin(t)*self.ket.r_90p +
@@ -870,7 +872,7 @@ calculator = OrbitalCalculator(stationary_orbital, ket_orbital, bra_orbital,
 
 # The MIT License (MIT)
 #
-# Copyright (c) 2015 Matthew B. Rowley
+# Copyright (c) 2015 Matthew B Rowley
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal

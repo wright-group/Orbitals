@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# This program is licences under an MIT license. Full licence is at the end of
+# This program is licenced under an MIT license. Full licence is at the end of
 # this file.
 """
 Hydrogenic.py
@@ -57,12 +57,12 @@ d_dict = {'z^2': lambda theta, phi: sqrt5/sqrtpi/4*(3*cos(phi)*cos(phi)-1),
 # 5z^3-3zr^2
 # TODO: Simplify real f orbitals.
 f_dict = {'z^3': lambda theta, phi: sqrt7/sqrtpi/4*(5*cos(phi)*cos(phi)*cos(phi)-3*cos(phi)),
-          'xz^2': lambda theta, phi: 1/sqrt2*(-sqrt21/sqrtpi/8*exp(1j*theta)*sin(phi)*(5*cos(phi)*cos(phi)-1)+sqrt21/sqrtpi/8*exp(-1j*theta)*sin(phi)*(5*cos(phi)*cos(phi)-1)),
-          'yz^2': lambda theta, phi: 1/1j/sqrt2*(-sqrt21/sqrtpi/8*exp(1j*theta)*sin(phi)*(5*cos(phi)*cos(phi)-1)-sqrt21/sqrtpi/8*exp(-1j*theta)*sin(phi)*(5*cos(phi)*cos(phi)-1)),
+          'xz^2': lambda theta, phi: 1/1j/sqrt2*(-sqrt21/sqrtpi/8*exp(1j*theta)*sin(phi)*(5*cos(phi)*cos(phi)-1)+sqrt21/sqrtpi/8*exp(-1j*theta)*sin(phi)*(5*cos(phi)*cos(phi)-1)),
+          'yz^2': lambda theta, phi: 1/sqrt2*(-sqrt21/sqrtpi/8*exp(1j*theta)*sin(phi)*(5*cos(phi)*cos(phi)-1)-sqrt21/sqrtpi/8*exp(-1j*theta)*sin(phi)*(5*cos(phi)*cos(phi)-1)),
           'xyz': lambda theta, phi: 1/sqrt2*(sqrt105/sqrt2/sqrtpi/4*exp(2j*theta)*sin(phi)*sin(phi)*cos(phi)+sqrt105/sqrt2/sqrtpi/4*exp(-2j*theta)*sin(phi)*sin(phi)*cos(phi)),
           'z(x^2-y^2)': lambda theta, phi: 1/1j/sqrt2*(sqrt105/sqrt2/sqrtpi/4*exp(2j*theta)*sin(phi)*sin(phi)*cos(phi)-sqrt105/sqrt2/sqrtpi/4*exp(-2j*theta)*sin(phi)*sin(phi)*cos(phi)),
-          'x(x^2-3y^2)': lambda theta, phi: 1/sqrt2*(-sqrt35/sqrtpi/8*exp(3j*theta)*sin(phi)*sin(phi)*sin(phi)+sqrt35/sqrtpi/8*exp(-3j*theta)*sin(phi)*sin(phi)*sin(phi)),
-          'y(3x^3-y^2)': lambda theta, phi: 1/1j/sqrt2*(-sqrt35/sqrtpi/8*exp(3j*theta)*sin(phi)*sin(phi)*sin(phi)-sqrt35/sqrtpi/8*exp(-3j*theta)*sin(phi)*sin(phi)*sin(phi)),
+          'x(x^2-3y^2)': lambda theta, phi: 1/1j/sqrt2*(-sqrt35/sqrtpi/8*exp(3j*theta)*sin(phi)*sin(phi)*sin(phi)+sqrt35/sqrtpi/8*exp(-3j*theta)*sin(phi)*sin(phi)*sin(phi)),
+          'y(3x^3-y^2)': lambda theta, phi: 1/sqrt2*(-sqrt35/sqrtpi/8*exp(3j*theta)*sin(phi)*sin(phi)*sin(phi)-sqrt35/sqrtpi/8*exp(-3j*theta)*sin(phi)*sin(phi)*sin(phi)),
           3: lambda theta, phi: -sqrt35/sqrtpi/8*exp(3j*theta)*sin(phi)*sin(phi)*sin(phi),
           2: lambda theta, phi: sqrt105/sqrt2/sqrtpi/4*exp(2j*theta)*sin(phi)*sin(phi)*cos(phi),
           1: lambda theta, phi: -sqrt21/sqrtpi/8*exp(1j*theta)*sin(phi)*(5*cos(phi)*cos(phi)-1),
